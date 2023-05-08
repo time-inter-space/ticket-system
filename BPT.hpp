@@ -8,84 +8,21 @@
 #include <string>
 #include <fstream>
 
-const int Block = 4096, KeySize = 68, ValSize = 4;
-const int M = (Block - 8 + KeySize) / (KeySize + 4) - 1, L = (Block - 12) / (KeySize + ValSize) - 1;
-
-template <class T1, class T2>
-class pair {
-public:
-	T1 first;
-	T2 second;
-	constexpr pair() : first(), second() {}
-	pair(const pair &other) = default;
-	pair(pair &&other) = default;
-	pair(const T1 &x, const T2 &y) : first(x), second(y) {}
-	template <class U1, class U2>
-	pair(U1 &&x, U2 &&y) : first(x), second(y) {}
-	template <class U1, class U2>
-	pair(const pair <U1, U2> &other) : first(other.first), second(other.second) {}
-	template <class U1, class U2>
-	pair(pair <U1, U2> &&other) : first(other.first), second(other.second) {}
-    pair <T1, T2> &operator=(const pair <T1, T2> &rhs) {
-        first = rhs.first;
-        second = rhs.second;
-        return *this;
-    }
-};
-struct string {
-    char ch[64];
-    string() {
-        ch[0] = 0;
-    }
-    string(const string &other) {
-        for (int i = 0; i < 64; ++i) ch[i] = other.ch[i];
-    }
-    string(char other[]) {
-        for (int i = 0; i < 64; ++i) ch[i] = other[i];
-    }
-    string &operator=(const string &rhs) {
-        for (int i = 0; i < 64; ++i) ch[i] = rhs.ch[i];
-        return *this;
-    }
-    bool operator<(const string &rhs) const {
-        for (int i = 0; i < 64 && (ch[i] || rhs.ch[i]); ++i)
-            if (ch[i] != rhs.ch[i]) return ch[i] < rhs.ch[i];
-        return 0;
-    }
-    bool operator==(const string &rhs) const {
-        for (int i = 0; i < 64 && (ch[i] || rhs.ch[i]); ++i)
-            if (ch[i] != rhs.ch[i]) return 0;
-        return 1;
-    }
-    bool operator!=(const string &rhs) const {
-        for (int i = 0; i < 64 && (ch[i] || rhs.ch[i]); ++i)
-            if (ch[i] != rhs.ch[i]) return 1;
-        return 0;
-    }
-};
-bool operator<(const pair <string, int> &lhs, const pair <string, int> &rhs) {
-    for (int i = 0; i < 64 && (lhs.first.ch[i] || rhs.first.ch[i]); ++i)
-        if (lhs.first.ch[i] != rhs.first.ch[i]) return lhs.first.ch[i] < rhs.first.ch[i];
-    return lhs.second < rhs.second;
-}
-bool operator!=(const pair <string, int> &lhs,const pair <string, int> &rhs) {
-    for (int i = 0; i < 64 && (lhs.first.ch[i] || rhs.first.ch[i]); ++i)
-        if (lhs.first.ch[i] != rhs.first.ch[i]) return 1;
-    return lhs.second != rhs.second;
-}
+const int Block = 4096;
 
 template <class Key, class T, class Compare = std::less<Key> >
 class BPT {
 private:
+    int KeySize, ValSize, M, L;
     int rt;
     int tot;
     int head;
     Compare cmp;
     Key newKey;
     std::fstream io;
-    Key tmpKey[M + L];
-    T tmpVal[M + L];
-    int tmpSn[M + L];
+    Key tmpKey[Block];
+    T tmpVal[Block];
+    int tmpSn[Block];
     int top;
     char buf[Block * 20];
     void incTop(int cur) {
@@ -98,13 +35,11 @@ private:
         io.write(buf + top * Block, Block);
         --top;
     }
-    void readKey(int addr, pair <string, int> &tmp) {
-        memcpy(tmp.first.ch, buf + top * Block + addr, KeySize - 4);
-        memcpy(reinterpret_cast <char *>(&tmp.second), buf + top * Block + addr + KeySize - 4, 4);
+    void readKey(int addr, Key &tmp) {
+        memcpy(reinterpret_cast <char *>(&tmp), buf + top * Block + addr, KeySize);
     }
-    void writeKey(int addr, const pair <string, int> &tmp) {
-        memcpy(buf + top * Block + addr, tmp.first.ch, KeySize - 4);
-        memcpy(buf + top * Block + addr + KeySize - 4, reinterpret_cast <const char *>(&tmp.second), 4);
+    void writeKey(int addr, const Key &tmp) {
+        memcpy(buf + top * Block + addr, reinterpret_cast <const char *>(&tmp), KeySize);
     }
     void readVal(int addr, T &tmp) {
         memcpy(reinterpret_cast <char *>(&tmp), buf + top * Block + addr, ValSize);
@@ -425,7 +360,9 @@ private:
         }
     }
 public:
-    BPT(std::string fileName) {
+    BPT(std::string fileName, int _KeySize, int _ValSize) : KeySize(_KeySize), ValSize(_ValSize) {
+        M = (Block - 8 + KeySize) / (KeySize + 4) - 1;
+        L = (Block - 12) / (KeySize + ValSize) - 1;
         io.open(fileName, std::ios::in | std::ios::out | std::ios::binary);
         top = -1;
         if (!io) {
@@ -484,7 +421,7 @@ public:
         if (!rt) return;
         erase(rt, 0, 0, key, key);
     }
-    void print(const string &ch) {
+    /*void print(const string &ch) {
         top = -1;
         int cur = rt;
         if (!cur) {
@@ -552,7 +489,7 @@ public:
             readKey(8 + (l - 1) * (KeySize + ValSize), tmp);
         }
         puts("");
-    }
+    }*/
 };
 
 #endif
