@@ -10,6 +10,28 @@
 
 const int Block = 4096;
 
+template <class T1, class T2>
+class pair {
+public:
+	T1 first;
+	T2 second;
+	constexpr pair() : first(), second() {}
+	pair(const pair &other) = default;
+	pair(pair &&other) = default;
+	pair(const T1 &x, const T2 &y) : first(x), second(y) {}
+	template <class U1, class U2>
+	pair(U1 &&x, U2 &&y) : first(x), second(y) {}
+	template <class U1, class U2>
+	pair(const pair <U1, U2> &other) : first(other.first), second(other.second) {}
+	template <class U1, class U2>
+	pair(pair <U1, U2> &&other) : first(other.first), second(other.second) {}
+    pair <T1, T2> &operator=(const pair <T1, T2> &rhs) {
+        first = rhs.first;
+        second = rhs.second;
+        return *this;
+    }
+};
+
 template <class Key, class T, class Compare = std::less<Key> >
 class BPT {
 private:
@@ -20,9 +42,9 @@ private:
     Compare cmp;
     Key newKey;
     std::fstream io;
-    Key tmpKey[Block];
-    T tmpVal[Block];
-    int tmpSn[Block];
+    Key *tmpKey;
+    T *tmpVal;
+    int *tmpSn;
     int top;
     char buf[Block * 20];
     void incTop(int cur) {
@@ -363,6 +385,9 @@ public:
     BPT(std::string fileName, int _KeySize, int _ValSize) : KeySize(_KeySize), ValSize(_ValSize) {
         M = (Block - 8 + KeySize) / (KeySize + 4) - 1;
         L = (Block - 12) / (KeySize + ValSize) - 1;
+        tmpKey = new Key[std::max(M, L) + 1];
+        tmpVal = new T[L + 1];
+        tmpSn = new int[M + 1];
         io.open(fileName, std::ios::in | std::ios::out | std::ios::binary);
         top = -1;
         if (!io) {
@@ -383,6 +408,9 @@ public:
         --top;
     }
     ~BPT() {
+        delete [] tmpKey;
+        delete [] tmpVal;
+        delete [] tmpSn;
         top = 0;
         writeInt(0, rt);
         writeInt(4, tot);
@@ -420,6 +448,57 @@ public:
         top = -1;
         if (!rt) return;
         erase(rt, 0, 0, key, key);
+    }
+    pair <int, T> find(const Key &key) {
+        top = -1;
+        int cur = rt;
+        T val;
+        pair <int, T> ret(-1, val);
+        if (!cur) return ret;
+        int n, isLeaf;
+        incTop(cur);
+        readInt(0, n);
+        readInt(4, isLeaf);
+        while (!isLeaf) {
+            int l = 1, r = n;
+            while (l < r) {
+                int mid = l + r + 1 >> 1;
+                Key tmp;
+                readKey(8 + (mid - 2) * (KeySize + 4) + 4, tmp);
+                if (tmp < key) l = mid;
+                else r = mid - 1;
+            }
+            readInt(8 + (l - 1) * (KeySize + 4), cur);
+            --top;
+            incTop(cur);
+            readInt(0, n);
+            readInt(4, isLeaf);
+        }
+        int l = 1, r = n;
+        Key tmp;
+        while (l < r) {
+            int mid = l + r + 1 >> 1;
+            readKey(8 + (mid - 1) * (KeySize + ValSize), tmp);
+            if (tmp < key) l = mid;
+            else r = mid - 1;
+        }
+        readKey(8 + (l - 1) * (KeySize + ValSize), tmp);
+        if (tmp != key) {
+            if (l < n) ++l;
+            else {
+                readInt(Block - 4, cur);
+                --top;
+                incTop(cur);
+                if (!cur) return ret;
+                readInt(0, n);
+                l = 1;
+            }
+            readKey(8 + (l - 1) * (KeySize + ValSize), tmp);
+        }
+        if (tmp != key) return ret;
+        ret.first = cur * Block + 8 + (l - 1) * (KeySize + ValSize) + KeySize;
+        readVal(8 + (l - 1) * (KeySize + ValSize) + KeySize, ret.second);
+        return ret;
     }
     /*void print(const string &ch) {
         top = -1;

@@ -39,16 +39,53 @@ struct string {
     }
 };
 
-BPT <string, string> users("user", 20, 79);
+void readOp(char &op) {
+    while ((op = getchar()) != '-') {
+        if (op == '\n') return;
+    }
+    op = getchar();
+}
+
+BPT <string, string> users("user", 20, 80);
+
 int main() {
+    bool isFirstUser = 1;
     while (1) {
         int timestamp;
         char cmd[20];
+        char op;
         scanf("[%d] %s", &timestamp, cmd);
         std::string Cmd;
         for (int i = 0; cmd[i]; i++) Cmd += cmd[i];
-        if (Cmd == "add_user")
-        {
+        if (Cmd == "add_user") {
+            string cur_username, username, info;
+            while (1) {
+                readOp(op);
+                if (op == 'c') scanf("%s", cur_username.ch);
+                if (op == 'u') scanf("%s", username.ch);
+                if (op == 'p') scanf("%s", info.ch);
+                if (op == 'n') scanf("%s", info.ch + 31);
+                if (op == 'm') scanf("%s", info.ch + 47);
+                if (op == 'g') {
+                    int tmp;
+                    scanf("%d", &tmp);
+                    if (isFirstUser) tmp = 10;
+                    info.ch[78] = tmp;
+                }
+                if (op == '\n') break;
+            }
+            printf("[%d] ", timestamp);
+            info.ch[79] = 0;
+            if (!isFirstUser) {
+                pair <int, string> tmp = find(cur_username);
+                if (tmp.first == -1 || !tmp.second.ch[79] || info.ch[78] >= tmp.second.ch[78]) {
+                    puts("-1");
+                    continue;
+                }
+            }
+            puts("0");
+            isFirstUser = 0;
+            continue;
         }
     }
 }
