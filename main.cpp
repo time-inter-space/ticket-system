@@ -46,7 +46,7 @@ void readOp(char &op) {
     op = getchar();
 }
 
-BPT <string, string> users("user", 20, 80);
+BPT <string, string> users("user", 21, 80);
 
 int main() {
     bool isFirstUser = 1;
@@ -77,14 +77,52 @@ int main() {
             printf("[%d] ", timestamp);
             info.ch[79] = 0;
             if (!isFirstUser) {
-                pair <int, string> tmp = find(cur_username);
+                pair <int, string> tmp = users.find(cur_username);
                 if (tmp.first == -1 || !tmp.second.ch[79] || info.ch[78] >= tmp.second.ch[78]) {
                     puts("-1");
                     continue;
                 }
             }
+            users.insert(username, info);
             puts("0");
             isFirstUser = 0;
+            continue;
+        }
+        if (Cmd == "login") {
+            string username, password;
+            while (1) {
+                readOp(op);
+                if (op == 'u') scanf("%s", username.ch);
+                if (op == 'p') scanf("%s", password.ch);
+                if (op == '\n') break;
+            }
+            printf("[%d] ", timestamp);
+            pair <int, string> tmp = users.find(username);
+            if (tmp.first == -1 || tmp.second.ch[79] || tmp.second != password) {
+                puts("-1");
+                continue;
+            }
+            tmp.second.ch[79] = 1;
+            users.modify(tmp.first + 79, tmp.second.ch + 79, 1);
+            puts("0");
+            continue;
+        }
+        if (Cmd == "logout") {
+            string username;
+            while (1) {
+                readOp(op);
+                if (op == 'u') scanf("%s", username.ch);
+                if (op == '\n') break;
+            }
+            printf("[%d] ", timestamp);
+            pair <int, string> tmp = users.find(username);
+            if (tmp.first == -1 || !tmp.second.ch[79]) {
+                puts("-1");
+                continue;
+            }
+            tmp.second.ch[79] = 0;
+            users.modify(tmp.first + 79, tmp.second.ch + 79, 1);
+            puts("0");
             continue;
         }
     }

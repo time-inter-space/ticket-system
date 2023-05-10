@@ -500,6 +500,10 @@ public:
         readVal(8 + (l - 1) * (KeySize + ValSize) + KeySize, ret.second);
         return ret;
     }
+    void modify(int addr, const char *ch, int len) {
+        io.seekp(addr);
+        io.write(ch, len);
+    }
     /*void print(const string &ch) {
         top = -1;
         int cur = rt;
