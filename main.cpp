@@ -46,10 +46,10 @@ void readOp(char &op) {
     op = getchar();
 }
 
-BPT <string, string> users("user", 21, 80);
+bool isFirstUser;
+BPT <string, string> users("user", 21, 80, isFirstUser);
 
 int main() {
-    bool isFirstUser = 1;
     while (1) {
         int timestamp;
         char cmd[20];
@@ -79,6 +79,11 @@ int main() {
             if (!isFirstUser) {
                 pair <int, string> tmp = users.find(cur_username);
                 if (tmp.first == -1 || !tmp.second.ch[79] || info.ch[78] >= tmp.second.ch[78]) {
+                    puts("-1");
+                    continue;
+                }
+                tmp = users.find(username);
+                if (tmp.first != -1) {
                     puts("-1");
                     continue;
                 }
@@ -124,6 +129,69 @@ int main() {
             users.modify(tmp.first + 79, tmp.second.ch + 79, 1);
             puts("0");
             continue;
+        }
+        if (Cmd == "query_profile") {
+            string cur_username, username;
+            while (1) {
+                readOp(op);
+                if (op == 'c') scanf("%s", cur_username.ch);
+                if (op == 'u') scanf("%s", username.ch);
+                if (op == '\n') break;
+            }
+            printf("[%d] ", timestamp);
+            pair <int, string> tmp1 = users.find(cur_username);
+            if (tmp1.first == -1 || !tmp1.second.ch[79]) {
+                puts("-1");
+                continue;
+            }
+            pair <int, string> tmp2 = users.find(username);
+            if (tmp2.first == -1 || tmp2.second.ch[78] > tmp1.second.ch[78]) {
+                puts("-1");
+                continue;
+            }
+            printf("%s %s %s %d\n", username.ch, tmp2.second.ch + 31, tmp2.second.ch + 47, tmp2.second.ch[78]);
+            continue;
+        }
+        if (Cmd == "modify_profile") {
+            string cur_username, username, info;
+            info.ch[0] = info.ch[31] = info.ch[47] = 0;
+            info.ch[78] = -1;
+            while (1) {
+                readOp(op);
+                if (op == 'c') scanf("%s", cur_username.ch);
+                if (op == 'u') scanf("%s", username.ch);
+                if (op == 'p') scanf("%s", info.ch);
+                if (op == 'n') scanf("%s", info.ch + 31);
+                if (op == 'm') scanf("%s", info.ch + 47);
+                if (op == 'g') {
+                    int tmp;
+                    scanf("%d", &tmp);
+                    info.ch[78] = tmp;
+                }
+                if (op == '\n') break;
+            }
+            printf("[%d] ", timestamp);
+            pair <int, string> tmp1 = users.find(cur_username);
+            if (tmp1.first == -1 || !tmp1.second.ch[79] || info.ch[78] >= tmp1.second.ch[78]) {
+                puts("-1");
+                continue;
+            }
+            pair <int, string> tmp2 = users.find(username);
+            if (tmp2.first == -1 || tmp2.second.ch[78] > tmp1.second.ch[78]) {
+                puts("-1");
+                continue;
+            }
+            if (info.ch[0]) memcpy(tmp2.second.ch, info.ch, 31);
+            if (info.ch[31]) memcpy(tmp2.second.ch + 31, info.ch + 31, 16);
+            if (info.ch[47]) memcpy(tmp2.second.ch + 47, info.ch + 47, 31);
+            if (info.ch[78] != -1) tmp2.second.ch[78] = info.ch[78];
+            users.modify(tmp2.first, tmp2.second.ch, 80);
+            printf("%s %s %s %d\n", username.ch, tmp2.second.ch + 31, tmp2.second.ch + 47, tmp2.second.ch[78]);
+            continue;
+        }
+        if (Cmd == "exit") {
+            printf("[%d] bye\n", timestamp);
+            return 0;
         }
     }
 }

@@ -382,15 +382,17 @@ private:
         }
     }
 public:
-    BPT(std::string fileName, int _KeySize, int _ValSize) : KeySize(_KeySize), ValSize(_ValSize) {
+    BPT(std::string fileName, int _KeySize, int _ValSize, bool &isFirst) : KeySize(_KeySize), ValSize(_ValSize) {
         M = (Block - 8 + KeySize) / (KeySize + 4) - 1;
         L = (Block - 12) / (KeySize + ValSize) - 1;
         tmpKey = new Key[std::max(M, L) + 1];
         tmpVal = new T[L + 1];
         tmpSn = new int[M + 1];
+        isFirst = 0;
         io.open(fileName, std::ios::in | std::ios::out | std::ios::binary);
         top = -1;
         if (!io) {
+            isFirst = 1;
             std::ofstream outfile;
             outfile.open(fileName);
             outfile.close();
