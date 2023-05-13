@@ -388,11 +388,9 @@ public:
         tmpKey = new Key[std::max(M, L) + 1];
         tmpVal = new T[L + 1];
         tmpSn = new int[M + 1];
-        isFirst = 0;
         io.open(fileName, std::ios::in | std::ios::out | std::ios::binary);
         top = -1;
         if (!io) {
-            isFirst = 1;
             std::ofstream outfile;
             outfile.open(fileName);
             outfile.close();
@@ -406,6 +404,7 @@ public:
         incTop(0);
         readInt(0, rt);
         readInt(4, tot);
+        isFirst = !tot;
         readInt(Block - 4, head);
         --top;
     }
@@ -505,6 +504,32 @@ public:
     void modify(int addr, const char *ch, int len) {
         io.seekp(addr);
         io.write(ch, len);
+    }
+    void modifyall(int addr, const char *ch, int len) {
+        int cur = rt;
+        if (!cur) return;
+        int n, isLeaf;
+        incTop(cur);
+        readInt(0, n);
+        readInt(4, isLeaf);
+        while (!isLeaf) {
+            readInt(8, cur);
+            --top;
+            incTop(cur);
+            readInt(0, n);
+            readInt(4, isLeaf);
+        }
+        while (1) {
+            for (int i = 1; i <= n; ++i) {
+                memcpy(buf + top * Block + 8 + (i - 1) * (KeySize + ValSize) + KeySize + addr, ch, len);
+            }
+            int tmp = cur;
+            readInt(Block - 4, cur);
+            decTop(tmp);
+            if (!cur) return;
+            incTop(cur);
+            readInt(0, n);
+        }
     }
     /*void print(const string &ch) {
         top = -1;
