@@ -39,38 +39,82 @@ struct string {
     }
 };
 
-struct realtime {
+struct date {
     int month, day, totDays;
-    int hour, minute, totMins;
     void calcTotDays() {
         totDays = day - 1;
-        if (month >= 7) totDays += 30;
-        if (month >= 8) totDays += 31; 
+        if (month > 6) totDays += 30;
+        if (month > 7) totDays += 31;
+        if (month > 8) totDays += 31; 
     }
-    void calcTotMins() {
-        calcTotDays();
-        totMins = totDays * 1440 + hour * 60 + minute;
-    }
-    realtime() {
+    date() {
         month = 6;
         day = 1;
-        hour = 0;
-        minute = 0;
-        calcTotMins();
+        totDays = 0;
     }
-    realtime(const realtime &other) {
+    date(const date &other) {
         month = other.month;
         day = other.day;
+        calcTotDays();
+    }
+    date(int _month, int _day) : month(_month), day(_day) { calcTotDays(); }
+    bool operator<(const date &rhs) const { return totDays < rhs.totDays; }
+    bool operator>(const date &rhs) const { return totDays > rhs.totDays; }
+    int operator-(const date &rhs) const { return totDays - rhs.totDays; }
+    date &operator+=(int dd) {
+        totDays += dd;
+        int tmp = totDays;
+        month = 6;
+        if (tmp >= 30) {
+            tmp -= 30;
+            month = 7;
+            if (tmp >= 31) {
+                tmp -= 31;
+                month = 8;
+                if (tmp >= 31) {
+                    tmp -= 31;
+                    month = 9;
+                }
+            }
+        }
+        day = tmp + 1;
+    }
+    void print() { printf("%d%d-%d%d", month / 10, month % 10, day / 10, day % 10); }
+};
+struct realtime {
+    date d;
+    int hour, minute, totMins;
+    void calcTotMins() { totMins = d.totDays * 1440 + hour * 60 + minute; }
+    realtime() : d() {
+        hour = 0;
+        minute = 0;
+        totMins = 0;
+    }
+    realtime(const realtime &other) : d(other.d) {
         hour = other.hour;
         minute = other.minute;
         calcTotMins();
     }
-    realtime(int _month, int _day, int _hour, int _minute) {
-        month = _month;
-        day = _day;
-        hour = _hour;
-        minute = _minute;
-        calcTotMins();
+    realtime(const date &_d, int _hour, int _minute)
+        : d(_d), hour(_hour), minute(_minute) { calcTotMins(); }
+    realtime(int _month, int _day, int _hour, int _minute)
+        : d(_month, _day), hour(_hour), minute(_minute) { calcTotMins(); }
+    realtime &operator+=(int dmin) {
+        minute += dmin;
+        if (minute >= 60) {
+            hour += minute / 60;
+            minute %= 60;
+        }
+        if (hour >= 24) {
+            d += hour / 24;
+            hour %=24;
+        }
+        totMins += dmin;
+        return *this;
+    }
+    void print() {
+        d.print();
+        printf(" %d%d:%d%d", hour / 10, hour % 10, minute / 10, minute % 10);
     }
 };
 
@@ -81,23 +125,37 @@ void readOp(char &op) {
     op = getchar();
 }
 
+const int BlockInfo = 4096, BlockTicketNum = 512;
+
 int main() {
-    freopen("testcases\\basic_1\\1.in", "r", stdin);
-    freopen("a.out", "w", stdout);
+    //freopen("testcases\\basic_1\\1.in", "r", stdin);
+    //freopen("a.out", "w", stdout);
     bool isFirstUser, isFirstTrain;
     BPT <string, string> users("user", 21, 80, isFirstUser);
     BPT <string, int> trainaddr("trainaddr", 21, 4, isFirstTrain);
     int trainNum;
-    std::fstream trainIO("train", std::ios::in | std::ios::out | std::ios::binary);
+    std::fstream trainIO("traininfo", std::ios::in | std::ios::out | std::ios::binary);
     if (!trainIO) {
         trainNum = 0;
-        std::ofstream tmp("train");
+        std::ofstream tmp("traininfo");
         tmp.close();
-        trainIO.open("train", std::ios::in | std::ios::out | std::ios::binary);
+        trainIO.open("traininfo", std::ios::in | std::ios::out | std::ios::binary);
     }
     else {
         trainIO.seekg(0);
         trainIO.read(reinterpret_cast<char *>(&trainNum), 4);
+    }
+    int traindateNum;
+    std::fstream ticketNumIO("ticketnum", std::ios::in | std::ios::out | std::ios::binary);
+    if (!ticketNumIO) {
+        traindateNum = 0;
+        std::ofstream tmp("ticketnum");
+        tmp.close();
+        ticketNumIO.open("ticketnum", std::ios::in | std::ios::out | std::ios::binary);
+    }
+    else {
+        ticketNumIO.seekg(0);
+        ticketNumIO.read(reinterpret_cast<char *>(&traindateNum), 4);
     }
     while (1) {
         int timestamp;
@@ -243,7 +301,7 @@ int main() {
             int stationNum, seatNum, h, m, bmon, bday, emon, eday;
             char type;
             char stations[3100], prices[700], travelTimes[600], stopoverTimes[600];
-            char info[Block];
+            char info[BlockInfo];
             while (1) {
                 readOp(op);
                 if (op == 'i') scanf("%s", trainID.ch);
@@ -284,7 +342,7 @@ int main() {
                 if (stations[i] == '|' || !stations[i]) {
                     info[cur] = 0;
                     ++j;
-                    cur = 33 + j * 31;
+                    cur = 34 + j * 31;
                     continue;
                 }
                 info[cur++] = stations[i];
@@ -317,10 +375,10 @@ int main() {
                     tmp = 0;
                     continue;
                 }
-                tmp = tmp * 10 + travelTimes[i] - '0';
+                tmp = tmp * 10 + stopoverTimes[i] - '0';
             }
-            trainIO.seekp(trainNum * Block);
-            trainIO.write(info, Block);
+            trainIO.seekp(trainNum * BlockInfo);
+            trainIO.write(info, BlockInfo);
             puts("0");
             continue;
         }
@@ -333,12 +391,12 @@ int main() {
             }
             printf("[%d] ", timestamp);
             pair <int, int> tmp = trainaddr.find(trainID);
-            if (tmp == -1) {
+            if (tmp.first == -1) {
                 puts("-1");
                 continue;
             }
             int isReleased;
-            trainIO.seekg(tmp.second * Block + 33);
+            trainIO.seekg(tmp.second * BlockInfo + 33);
             trainIO.read(reinterpret_cast<char *>(&isReleased), 1);
             if (isReleased) {
                 puts("-1");
@@ -357,22 +415,120 @@ int main() {
             }
             printf("[%d] ", timestamp);
             pair <int, int> tmp = trainaddr.find(trainID);
-            if (tmp == -1) {
+            if (tmp.first == -1) {
                 puts("-1");
                 continue;
             }
-            char info[Block];
-            trainIO.seekg(tmp.second * Block);
-            trainIO.read(info, Block);
+            char info[BlockInfo];
+            trainIO.seekg(tmp.second * BlockInfo);
+            trainIO.read(info, BlockInfo);
             if (info[33]) {
                 puts("-1");
                 continue;
             }
             info[33] = 1;
-            trainIO.seekp(tmp.second * Block + 33);
-            trainIO.write(info + 33, 1);
+            memcpy(info + 3933, reinterpret_cast<const char *>(&traindateNum), 4);
+            trainIO.seekp(tmp.second * BlockInfo);
+            trainIO.write(info, BlockInfo);
+            date bd(info[28], info[29]), ed(info[30], info[31]);
+            int dday = ed - bd;
+            char restSeats[BlockTicketNum];
+            for (int i = 0; i < info[21] - 1; ++i) memcpy(restSeats + i * 4, info + 22, 4);
+            for (int i = 1; i <= dday; ++i) {
+                ticketNumIO.seekp((traindateNum + i) * BlockTicketNum);
+                ticketNumIO.write(restSeats, BlockTicketNum);
+            }
+            traindateNum += dday;
+            puts("0");
+            continue;
         }
         if (Cmd == "query_train") {
+            string trainID;
+            date d;
+            while (1) {
+                readOp(op);
+                if (op == 'i') scanf("%s", trainID.ch);
+                if (op == 'd') {
+                    scanf("%d-%d", &d.month, &d.day);
+                    d.calcTotDays();
+                }
+                if (op == '\n') break;
+            }
+            printf("[%d] ", timestamp);
+            pair <int, int> tmp = trainaddr.find(trainID);
+            if (tmp.first == -1) {
+                puts("-1");
+                continue;
+            }
+            char info[BlockInfo];
+            trainIO.seekg(tmp.second * BlockInfo);
+            trainIO.read(info, BlockInfo);
+            date bd(info[28], info[29]), ed(info[30], info[31]);
+            if (d < bd || d > ed) {
+                puts("-1");
+                continue;
+            }
+            printf("%s %c\n", info, info[32]);
+            int restSeats[100];
+            if (!info[33]) {
+                memcpy(reinterpret_cast<char *>(restSeats), info + 22, 4);
+                for (int i = 1; i < info[21] - 1; ++i) restSeats[i] = restSeats[0];
+            }
+            else {
+                int ticketNumAddr;
+                memcpy(reinterpret_cast<char *>(&ticketNumAddr), info + 3933, 4);
+                ticketNumAddr += d - bd;
+                ticketNumIO.seekg(ticketNumAddr * BlockTicketNum);
+                ticketNumIO.read(reinterpret_cast<char *>(restSeats), (info[21] - 1) * 4);
+            }
+            int curPrice = 0;
+            realtime curTime(d, info[26], info[27]);
+            for (int i = 0; i < info[21]; ++i) {
+                printf("%s ", info + 34 + i * 31);
+                if (!i) printf("xx-xx xx:xx");
+                else {
+                    int dprice, dmin;
+                    memcpy(reinterpret_cast<char *>(&dprice), info + 3134 + (i - 1) * 4, 4);
+                    memcpy(reinterpret_cast<char *>(&dmin), info + 3534 + (i - 1) * 2, 2);
+                    curPrice += dprice;
+                    curTime += dmin;
+                    curTime.print();
+                }
+                printf(" -> ");
+                if (i == info[21] - 1) printf("xx-xx xx:xx");
+                else {
+                    if (i) {
+                        int dmin;
+                        memcpy(reinterpret_cast<char *>(&dmin), info + 3734 + (i - 1) * 4, 2);
+                        curTime += dmin;
+                    }
+                    curTime.print();
+                }
+                printf(" %d ", curPrice);
+                if (i == info[21] - 1) puts("x");
+                else printf("%d\n", restSeats[i]);
+            }
+            continue;
+        }
+        if (Cmd == "query_ticket") {
+            string sstation, tstation;
+            date d;
+            int p = 1;
+            while (1) {
+                readOp(op);
+                if (op == 's') scanf("%s", sstation.ch);
+                if (op == 't') scanf("%s", tstation.ch);
+                if (op == 'd') {
+                    scanf("%d-%d", &d.month, &d.day);
+                    d.calcTotDays();
+                }
+                if (op == 'p') {
+                    char tmp[5];
+                    scanf("%s", tmp);
+                    if (tmp[0] == 'c') p = 0;
+                }
+                if (op == '\n') break;
+            }
             
         }
         if (Cmd == "exit") {
@@ -380,6 +536,10 @@ int main() {
             users.modifyall(79, reinterpret_cast<const char *>(&tmp), 1);
             trainIO.seekp(0);
             trainIO.write(reinterpret_cast<const char *>(&trainNum), 4);
+            trainIO.close();
+            ticketNumIO.seekp(0);
+            ticketNumIO.write(reinterpret_cast<const char *>(&traindateNum), 4);
+            ticketNumIO.close();
             printf("[%d] bye\n", timestamp);
             return 0;
         }
