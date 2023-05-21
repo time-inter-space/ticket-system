@@ -419,6 +419,50 @@ public:
         decTop(0);
         io.close();
     }
+    class iterator {
+    private:
+        int blockAddr, n, i;
+        const BPT <Key, T> *BPTptr;
+        char info[Block];
+        friend class BPT <Key, T>;
+    public:
+        iterator() {
+            blockAddr = 0;
+            BPTptr = nullptr;
+        }
+        iterator(const iterator &other) {
+            blockAddr = other.blockAddr;
+            n = other.n;
+            i = other.i;
+            BPTptr = other.BPTptr;
+            memcpy(info, other.info, Block);
+        }
+        bool inc() {
+            if (!blockAddr) return 0;
+            ++i;
+            if (i > n) {
+                memcpy(reinterpret_cast<char *>(&blockAddr), info + Block - 4, 4);
+                if (!blockAddr) return 0;
+                io.seekg(blockAddr * Block);
+                io.read(info, Block);
+                memcpy(reinterpret_cast<char *>(&n), info, 4);
+                i = 1;
+            }
+            return 1;
+        }
+        bool first(Key &key) {
+            if (!blockAddr) return 0;
+            memcpy(reinterpret_cast<char *>(&key),
+              info + 8 + (i - 1) * (BPTptr->KeySize + BPTptr->ValSize), BPTptr->KeySize);
+            return 1;
+        }
+        bool second(T &val) {
+            if (!blockAddr) return 0;
+            memcpy(reinterpret_cast<char *>(&val),
+              info + 8 + (i - 1) * (BPTptr->KeySize + BPTptr->ValSize) + BPTptr->KeySize, BPTptr->ValSize);
+            return 1;
+        }
+    };
     void insert(const Key &key, const T &val) {
         top = -1;
         if (!rt) {
@@ -530,6 +574,58 @@ public:
             incTop(cur);
             readInt(0, n);
         }
+    }
+    void lower_bound(iterator &it, Key key) {
+        top = -1;
+        int cur = rt;
+        T val;
+        it.BPTptr = this;
+        it.blockAddr = 0;
+        if (!cur) return;
+        int n, isLeaf;
+        incTop(cur);
+        readInt(0, n);
+        readInt(4, isLeaf);
+        while (!isLeaf) {
+            int l = 1, r = n;
+            while (l < r) {
+                int mid = l + r + 1 >> 1;
+                Key tmp;
+                readKey(8 + (mid - 2) * (KeySize + 4) + 4, tmp);
+                if (tmp < key) l = mid;
+                else r = mid - 1;
+            }
+            readInt(8 + (l - 1) * (KeySize + 4), cur);
+            --top;
+            incTop(cur);
+            readInt(0, n);
+            readInt(4, isLeaf);
+        }
+        int l = 1, r = n;
+        Key tmp;
+        while (l < r) {
+            int mid = l + r + 1 >> 1;
+            readKey(8 + (mid - 1) * (KeySize + ValSize), tmp);
+            if (tmp < key) l = mid;
+            else r = mid - 1;
+        }
+        readKey(8 + (l - 1) * (KeySize + ValSize), tmp);
+        if (tmp < key) {
+            if (l < n) ++l;
+            else {
+                readInt(Block - 4, cur);
+                --top;
+                incTop(cur);
+                if (!cur) return;
+                readInt(0, n);
+                l = 1;
+            }
+            readKey(8 + (l - 1) * (KeySize + ValSize), tmp);
+        }
+        it.blockAddr = cur;
+        it.n = n;
+        it.i = l;
+        memcpy(it.info, buf + top * Block, Block);
     }
     /*void print(const string &ch) {
         top = -1;
