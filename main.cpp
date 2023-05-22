@@ -181,9 +181,33 @@ struct realtime {
 struct query_ticket_info {
     char trainID[21];
     realtime stime, ttime;
-    int price, seat;
+    int totTime, price, seat;
 };
+bool cmpTime(const query_ticket_info &lhs, const query_ticket_info &rhs) {
+    if (lhs.totTime != rhs.totTime) return lhs.totTime < rhs.totTime;
+    return lhs.trainID < rhs.trainID;
+}
+bool cmpCost(const query_ticket_info &lhs, const query_ticket_info &rhs) {
+    if (lhs.price != rhs.price) return lhs.price < rhs.price;
+    return lhs.trainID < rhs.trainID;
+}
 struct query_transfer_info {};
+template<class RandomIt, class Compare>
+void sort(RandomIt st, RandomIt ed, Compare cmp) {
+    if (st >= ed) return;
+    RandomIt l = st, r = ed - 1, bs = st + 998244353 % (ed - st);
+    while (l <= r)
+    {
+        while (l <= r && cmp(*l, *bs)) ++l;
+        while (l <= r && cmp(*bs, *r)) --r;
+        if (l > r) break;
+        std::swap(*l, *r);
+        ++l;
+        --r;
+    }
+    sort(st, r + 1, cmp);
+    sort(l, ed, cmp);
+}
 
 const int BlockInfo = 4096, BlockTicketNum = 512;
 
@@ -228,6 +252,7 @@ void init() {
 int main() {
     //freopen("testcases\\basic_1\\1.in", "r", stdin);
     //freopen("a.out", "w", stdout);
+    init();
     while (1) {
         int timestamp;
         char cmd[20];
@@ -590,7 +615,7 @@ int main() {
         if (Cmd == "query_ticket") {
             station_train sstation, tstation;
             date d;
-            int p = 1;
+            bool (*p)(const query_ticket_info &, const query_ticket_info &) = cmpTime;
             while (1) {
                 readOp(op);
                 if (op == 's') scanf("%s", sstation.ch);
@@ -602,7 +627,7 @@ int main() {
                 if (op == 'p') {
                     char tmp[5];
                     scanf("%s", tmp);
-                    if (tmp[0] == 'c') p = 0;
+                    if (tmp[0] == 'c') p = cmpCost;
                 }
                 if (op == '\n') break;
             }
@@ -637,13 +662,18 @@ int main() {
                         date bd(info[28], info[29]), ed(info[30], info[31]);
                         int dd1 = ed - bd, dd2 = d - stime.d;
                         if (dd2 >= 0 && dd2 <= dd1) {
-                            ++num;
-                            memcpy(ans[num].trainID, info, 21);
-                            ans[num].stime = stime;
                             realtime ttime(stime);
-                            int tmp = 0;
+                            int tmp = 0, price, seat;
                             memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
                             ttime += tmp;
+                            memcpy(reinterpret_cast<char *>(&price), info + 3134 + i * 4, 4);
+                            char ticketNum[BlockTicketNum];
+                            int ticketNumAddr;
+                            memcpy(reinterpret_cast<char *>(&ticketNumAddr), info + 3934, 4);
+                            ticketNumAddr += dd2;
+                            ticketNumIO.seekg(ticketNumAddr * BlockTicketNum);
+                            ticketNumIO.read(ticketNum, BlockTicketNum);
+                            memcpy(reinterpret_cast<char *>(&seat), ticketNum + i * 4, 4);
                             ++i;
                             while (i < info[21]) {
                                 if (cmp(info + 34 + i * 31, tstation.ch)) break;
@@ -651,12 +681,65 @@ int main() {
                                 ttime += tmp;
                                 memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
                                 ttime += tmp;
+                                memcpy(reinterpret_cast<char *>(&tmp), info + 3134 + i * 4, 4);
+                                price += tmp;
+                                memcpy(reinterpret_cast<char *>(&tmp), ticketNum + i * 4, 4);
+                                seat = std::min(seat, tmp);
                                 ++i;
                             }
+                            ++num;
+                            memcpy(ans[num].trainID, info, 21);
+                            ans[num].stime = stime;
+                            ans[num].stime.d += dd2;
+                            ans[num].ttime = ttime;
+                            ans[num].ttime.d += dd2;
+                            ans[num].totTime = ttime - stime;
+                            ans[num].price = price;
+                            ans[num].seat = seat;
                         }
+                    }
+                    if (flag <= 0) {
+                        its.inc();
+                        its.first(scur);
+                        if (!cmpStation(scur, sstation)) break;
+                    }
+                    if (flag >= 0) {
+                        itt.inc();
+                        itt.first(tcur);
+                        if (!cmpStation(tcur, tstation)) break;
                     }
                 }
             }
+            sort(ans + 1, ans + num + 1, p);
+            printf("%d\n", num);
+            for (int i = 1; i <= num; ++i) {
+                printf("%s %s ", ans[i].trainID, sstation.ch);
+                ans[i].stime.print();
+                printf(" -> %s ", tstation.ch);
+                ans[i].ttime.print();
+                printf(" %d %d\n", ans[i].price, ans[i].seat);
+            }
+        }
+        if (Cmd == "query_transfer") {
+            station_train sstation, tstation;
+            date d;
+            bool (*p)(const query_transfer_info &, const query_transfer_info &) = cmpTime;
+            while (1) {
+                readOp(op);
+                if (op == 's') scanf("%s", sstation.ch);
+                if (op == 't') scanf("%s", tstation.ch);
+                if (op == 'd') {
+                    scanf("%d-%d", &d.month, &d.day);
+                    d.calcTotDays();
+                }
+                if (op == 'p') {
+                    char tmp[5];
+                    scanf("%s", tmp);
+                    if (tmp[0] == 'c') p = cmpCost;
+                }
+                if (op == '\n') break;
+            }
+            
         }
         if (Cmd == "exit") {
             int tmp = 0;

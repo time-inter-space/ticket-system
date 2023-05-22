@@ -422,7 +422,7 @@ public:
     class iterator {
     private:
         int blockAddr, n, i;
-        const BPT <Key, T> *BPTptr;
+        BPT <Key, T> *BPTptr;
         char info[Block];
         friend class BPT <Key, T>;
     public:
@@ -443,8 +443,8 @@ public:
             if (i > n) {
                 memcpy(reinterpret_cast<char *>(&blockAddr), info + Block - 4, 4);
                 if (!blockAddr) return 0;
-                io.seekg(blockAddr * Block);
-                io.read(info, Block);
+                BPTptr->io.seekg(blockAddr * Block);
+                BPTptr->io.read(info, Block);
                 memcpy(reinterpret_cast<char *>(&n), info, 4);
                 i = 1;
             }
