@@ -627,6 +627,7 @@ public:
         it.i = l;
         memcpy(it.info, buf + top * Block, Block);
     }
+    void clear() { rt = tot = head = 0; }
     /*void print(const string &ch) {
         top = -1;
         int cur = rt;

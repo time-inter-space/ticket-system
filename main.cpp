@@ -13,27 +13,27 @@ struct string {
         ch[0] = 0;
     }
     string(const string &other) {
-        for (int i = 0; i < StrLen; ++i) ch[i] = other.ch[i];
+        memcpy(ch, other.ch, StrLen);
     }
     string(char other[]) {
-        for (int i = 0; i < StrLen; ++i) ch[i] = other[i];
+        memcpy(ch, other, StrLen);
     }
     string &operator=(const string &rhs) {
-        for (int i = 0; i < StrLen; ++i) ch[i] = rhs.ch[i];
+        memcpy(ch, rhs.ch, StrLen);
         return *this;
     }
     bool operator<(const string &rhs) const {
-        for (int i = 0; i < StrLen && (ch[i] || rhs.ch[i]); ++i)
+        for (int i = 0; ch[i] || rhs.ch[i]; ++i)
             if (ch[i] != rhs.ch[i]) return ch[i] < rhs.ch[i];
         return 0;
     }
     bool operator==(const string &rhs) const {
-        for (int i = 0; i < StrLen && (ch[i] || rhs.ch[i]); ++i)
+        for (int i = 0; ch[i] || rhs.ch[i]; ++i)
             if (ch[i] != rhs.ch[i]) return 0;
         return 1;
     }
     bool operator!=(const string &rhs) const {
-        for (int i = 0; i < StrLen && (ch[i] || rhs.ch[i]); ++i)
+        for (int i = 0; ch[i] || rhs.ch[i]; ++i)
             if (ch[i] != rhs.ch[i]) return 1;
         return 0;
     }
@@ -120,8 +120,7 @@ struct date {
     bool operator<(const date &rhs) const { return totDays < rhs.totDays; }
     bool operator>(const date &rhs) const { return totDays > rhs.totDays; }
     int operator-(const date &rhs) const { return totDays - rhs.totDays; }
-    date &operator+=(int dd) {
-        totDays += dd;
+    void update() {
         int tmp = totDays;
         month = 6;
         if (tmp >= 30) {
@@ -137,6 +136,14 @@ struct date {
             }
         }
         day = tmp + 1;
+    }
+    date &operator+=(int dd) {
+        totDays += dd;
+        update();
+    }
+    date &operator-=(int dd) {
+        totDays -= dd;
+        update();
     }
     void print() { printf("%d%d-%d%d", month / 10, month % 10, day / 10, day % 10); }
 };
@@ -163,12 +170,29 @@ struct realtime {
         if (minute >= 60) {
             hour += minute / 60;
             minute %= 60;
-        }
-        if (hour >= 24) {
-            d += hour / 24;
-            hour %=24;
+            if (hour >= 24) {
+                d += hour / 24;
+                hour %=24;
+            }
         }
         totMins += dmin;
+        return *this;
+    }
+    realtime &operator-=(int dmin) {
+        minute -= dmin;
+        if (minute < 0) {
+            int tar = minute % 60;
+            if (tar < 0) tar += 60;
+            hour -= (tar - minute) / 60;
+            minute = tar;
+            if (hour < 0) {
+                tar = hour % 24;
+                if (tar < 0) tar += 24;
+                d -= (tar - hour) / 24;
+                hour = tar;
+            }
+        }
+        totMins -= dmin;
         return *this;
     }
     int operator-(const realtime &rhs) const { return totMins - rhs.totMins; }
@@ -177,7 +201,12 @@ struct realtime {
         printf(" %d%d:%d%d", hour / 10, hour % 10, minute / 10, minute % 10);
     }
 };
+bool cmpHourMin(const realtime &lhs, const realtime &rhs) {
+    if (lhs.hour != rhs.hour) return lhs.hour < rhs.hour;
+    return lhs.minute < rhs.minute;
+}
 
+const int inf = 0x3f3f3f3f;
 struct query_ticket_info {
     char trainID[21];
     realtime stime, ttime;
@@ -185,13 +214,43 @@ struct query_ticket_info {
 };
 bool cmpTime(const query_ticket_info &lhs, const query_ticket_info &rhs) {
     if (lhs.totTime != rhs.totTime) return lhs.totTime < rhs.totTime;
-    return lhs.trainID < rhs.trainID;
+    for (int i = 0; lhs.trainID[i] || rhs.trainID[i]; ++i)
+        if (lhs.trainID[i] != rhs.trainID[i]) return lhs.trainID[i] < rhs.trainID[i];
+    return 0;
 }
 bool cmpCost(const query_ticket_info &lhs, const query_ticket_info &rhs) {
     if (lhs.price != rhs.price) return lhs.price < rhs.price;
-    return lhs.trainID < rhs.trainID;
+    for (int i = 0; lhs.trainID[i] || rhs.trainID[i]; ++i)
+        if (lhs.trainID[i] != rhs.trainID[i]) return lhs.trainID[i] < rhs.trainID[i];
+    return 0;
 }
-struct query_transfer_info {};
+struct query_transfer_info {
+    char trainID1[21], trainID2[21], station[31];
+    realtime stime1, ttime1, stime2, ttime2;
+    int price1, price2, seat1, seat2, totTime, totPrice;
+    query_transfer_info() {totTime = totPrice = inf;}
+    void update() {
+        totTime = ttime2 - stime1;
+        totPrice = price1 + price2;
+    }
+};
+bool cmpTrainID12(const query_transfer_info &lhs, const query_transfer_info &rhs) {
+    for (int i = 0; lhs.trainID1[i] || rhs.trainID1[i]; ++i)
+        if (lhs.trainID1[i] != rhs.trainID1[i]) return lhs.trainID1[i] < rhs.trainID1[i];
+    for (int i = 0; lhs.trainID2[i] || rhs.trainID2[i]; ++i)
+        if (lhs.trainID2[i] != rhs.trainID2[i]) return lhs.trainID2[i] < rhs.trainID2[i];
+    return 0;
+}
+bool cmpTime(const query_transfer_info &lhs, const query_transfer_info &rhs) {
+    if (lhs.totTime != rhs.totTime) return lhs.totTime < rhs.totTime;
+    if (lhs.totPrice != rhs.totPrice) return lhs.totPrice < rhs.totPrice;
+    return cmpTrainID12(lhs, rhs);
+}
+bool cmpCost(const query_transfer_info &lhs, const query_transfer_info &rhs) {
+    if (lhs.totPrice != rhs.totPrice) return lhs.totPrice < rhs.totPrice;
+    if (lhs.totTime != rhs.totTime) return lhs.totTime < rhs.totTime;
+    return cmpTrainID12(lhs, rhs);
+}
 template<class RandomIt, class Compare>
 void sort(RandomIt st, RandomIt ed, Compare cmp) {
     if (st >= ed) return;
@@ -215,6 +274,7 @@ bool isFirstUser, isFirstTrain;
 BPT <string, string> users("user", 21, 80, isFirstUser);
 BPT <string, int> trainaddr("trainaddr", 21, 4, isFirstTrain);
 BPT <station_train, int> stations("stationtrain", 52, 4, isFirstTrain);
+BPT <station_train, string> tags("tag", 52, 16, isFirstTrain);
 int trainNum, traindateNum;
 std::fstream trainIO, ticketNumIO;
 
@@ -223,6 +283,18 @@ void readOp(char &op) {
         if (op == '\n') return;
     }
     op = getchar();
+}
+void time_to_str(char *lhs, const realtime &rhs) {
+    *lhs = rhs.d.month;
+    *(lhs + 1) = rhs.d.day;
+    *(lhs + 2) = rhs.hour;
+    *(lhs + 3) = rhs.minute;
+}
+void str_to_time(realtime &lhs, const char *rhs) {
+    lhs.d.month = *rhs;
+    lhs.d.day = *(rhs + 1);
+    lhs.hour = *(rhs + 2);
+    lhs.minute = *(rhs + 3);
 }
 void init() {
     trainIO.open("traininfo", std::ios::in | std::ios::out | std::ios::binary);
@@ -652,7 +724,7 @@ int main() {
                         int i = 0;
                         while (i < info[21]) {
                             if (cmp(info + 34 + i * 31, sstation.ch)) break;
-                            int tmp = 0;
+                            int tmp;
                             memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
                             stime += tmp;
                             memcpy(reinterpret_cast<char *>(&tmp), info + 3734 + i * 2, 2);
@@ -663,7 +735,8 @@ int main() {
                         int dd1 = ed - bd, dd2 = d - stime.d;
                         if (dd2 >= 0 && dd2 <= dd1) {
                             realtime ttime(stime);
-                            int tmp = 0, price, seat;
+                            int tmp, price, seat;
+                            bool isAns = 0;
                             memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
                             ttime += tmp;
                             memcpy(reinterpret_cast<char *>(&price), info + 3134 + i * 4, 4);
@@ -676,7 +749,10 @@ int main() {
                             memcpy(reinterpret_cast<char *>(&seat), ticketNum + i * 4, 4);
                             ++i;
                             while (i < info[21]) {
-                                if (cmp(info + 34 + i * 31, tstation.ch)) break;
+                                if (cmp(info + 34 + i * 31, tstation.ch)) {
+                                    isAns = 1;
+                                    break;
+                                }
                                 memcpy(reinterpret_cast<char *>(&tmp), info + 3734 + (i - 1) * 2, 2);
                                 ttime += tmp;
                                 memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
@@ -687,15 +763,17 @@ int main() {
                                 seat = std::min(seat, tmp);
                                 ++i;
                             }
-                            ++num;
-                            memcpy(ans[num].trainID, info, 21);
-                            ans[num].stime = stime;
-                            ans[num].stime.d += dd2;
-                            ans[num].ttime = ttime;
-                            ans[num].ttime.d += dd2;
-                            ans[num].totTime = ttime - stime;
-                            ans[num].price = price;
-                            ans[num].seat = seat;
+                            if (isAns) {
+                                ++num;
+                                memcpy(ans[num].trainID, info, 21);
+                                ans[num].stime = stime;
+                                ans[num].stime.d += dd2;
+                                ans[num].ttime = ttime;
+                                ans[num].ttime.d += dd2;
+                                ans[num].totTime = ttime - stime;
+                                ans[num].price = price;
+                                ans[num].seat = seat;
+                            }
                         }
                     }
                     if (flag <= 0) {
@@ -719,6 +797,7 @@ int main() {
                 ans[i].ttime.print();
                 printf(" %d %d\n", ans[i].price, ans[i].seat);
             }
+            continue;
         }
         if (Cmd == "query_transfer") {
             station_train sstation, tstation;
@@ -739,7 +818,209 @@ int main() {
                 }
                 if (op == '\n') break;
             }
-            
+            printf("[%d] ", timestamp);
+            query_transfer_info ans;
+            BPT <station_train, int>::iterator it;
+            stations.lower_bound(it, sstation);
+            station_train cur;
+            tags.clear();
+            while (it.first(cur) && cmpStation(sstation, cur)) {
+                int addr;
+                it.second(addr);
+                char info[BlockInfo];
+                trainIO.seekg(addr * BlockInfo);
+                trainIO.read(info, BlockInfo);
+                realtime stime(info[28], info[29], info[26], info[27]);
+                int i = 0;
+                while (i < info[21]) {
+                    if (cmp(info + 34 + i * 31, sstation.ch)) break;
+                    int tmp = 0;
+                    memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
+                    stime += tmp;
+                    memcpy(reinterpret_cast<char *>(&tmp), info + 3734 + i * 2, 2);
+                    stime += tmp;
+                    ++i;
+                }
+                date bd(info[28], info[29]), ed(info[30], info[31]);
+                int dd1 = ed - bd, dd2 = d - stime.d;
+                if (dd2 >= 0 && dd2 <= dd1) {
+                    string tagInfo;
+                    station_train curStation;
+                    memcpy(curStation.ch + 31, info, 21);
+                    stime.d = d;
+                    stime.calcTotMins();
+                    time_to_str(tagInfo.ch, stime);
+                    int tmp, price, seat;
+                    memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
+                    stime += tmp;
+                    memcpy(reinterpret_cast<char *>(&price), info + 3134 + i * 4, 4);
+                    char ticketNum[BlockTicketNum];
+                    int ticketNumAddr;
+                    memcpy(reinterpret_cast<char *>(&ticketNumAddr), info + 3934, 4);
+                    ticketNumAddr += dd2;
+                    ticketNumIO.seekg(ticketNumAddr * BlockTicketNum);
+                    ticketNumIO.read(ticketNum, BlockTicketNum);
+                    memcpy(reinterpret_cast<char *>(&seat), ticketNum + i * 4, 4);
+                    ++i;
+                    while (i < info[21]) {
+                        memcpy(curStation.ch, info + 34 + i * 31, 31);
+                        time_to_str(tagInfo.ch + 4, stime);
+                        memcpy(tagInfo.ch + 8, reinterpret_cast<const char *>(&price), 4);
+                        memcpy(tagInfo.ch + 12, reinterpret_cast<const char *>(&seat), 4);
+                        tags.insert(curStation, tagInfo);
+                        memcpy(reinterpret_cast<char *>(&tmp), info + 3734 + (i - 1) * 2, 2);
+                        stime += tmp;
+                        memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
+                        stime += tmp;
+                        memcpy(reinterpret_cast<char *>(&tmp), info + 3134 + i * 4, 4);
+                        price += tmp;
+                        memcpy(reinterpret_cast<char *>(&tmp), ticketNum + i * 4, 4);
+                        seat = std::min(seat, tmp);
+                        ++i;
+                    }
+                }
+                it.inc();
+            }
+            stations.lower_bound(it, tstation);
+            while (it.first(cur) && cmpStation(tstation, cur)) {
+                query_transfer_info tmpAns;
+                int addr;
+                it.second(addr);
+                char info[BlockInfo];
+                trainIO.seekg(addr * BlockInfo);
+                trainIO.read(info, BlockInfo);
+                memcpy(tmpAns.trainID2, info, 21);
+                realtime ttime(info[28], info[29], info[26], info[27]);
+                int i = 0;
+                while (i < info[21]) {
+                    if (cmp(info + 34 + i * 31, tstation.ch)) break;
+                    int tmp;
+                    memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
+                    ttime += tmp;
+                    memcpy(reinterpret_cast<char *>(&tmp), info + 3734 + i * 2, 2);
+                    ttime += tmp;
+                    ++i;
+                }
+                --i;
+                int tmp, price;
+                memcpy(reinterpret_cast<char *>(&tmp), info + 3734 + i * 2, 2);
+                ttime -= tmp;
+                realtime stime(ttime);
+                memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
+                stime -= tmp;
+                memcpy(reinterpret_cast<char *>(&price), info + 3134 + i * 4, 4);
+                while (i >= 0) {
+                    station_train curStation, tmpStation;
+                    memcpy(curStation.ch, info + 34 + i * 31, 31);
+                    memcpy(tmpAns.station, curStation.ch, 31);
+                    BPT <station_train, string>::iterator tagIt;
+                    tags.lower_bound(tagIt, curStation);
+                    while (tagIt.first(tmpStation) && cmpStation(curStation, tmpStation)) {
+                        string tagInfo;
+                        tagIt.second(tagInfo);
+                        str_to_time(tmpAns.ttime1, tagInfo.ch + 4);
+                        date bd(info[28], info[29]), ed(info[30], info[31]);
+                        int dd1 = ed - bd, dd2 = tmpAns.ttime1.d - stime.d;
+                        if (cmpHourMin(tmpAns.ttime1, stime)) ++dd2;
+                        if (dd2 < 0) dd2 = 0;
+                        if (dd2 >= 0 && dd2 <= dd1) {
+                            memcpy(tmpAns.trainID1, tmpStation.ch + 31, 21);
+                            str_to_time(tmpAns.stime1, tagInfo.ch);
+                            memcpy(reinterpret_cast<char *>(&tmpAns.price1), tagInfo.ch + 8, 4);
+                            memcpy(reinterpret_cast<char *>(&tmpAns.seat1), tagInfo.ch + 12, 4);
+                            tmpAns.stime2 = stime;
+                            tmpAns.stime2.d += dd2;
+                            tmpAns.ttime2 = ttime;
+                            tmpAns.ttime2.d += dd2;
+                            tmpAns.price2 = price;
+                            tmpAns.seat2 = dd2;
+                            tmpAns.update();
+                            if (p(tmpAns, ans)) ans = tmpAns;
+                        }
+                        tagIt.inc();
+                    }
+                    --i;
+                    memcpy(reinterpret_cast<char *>(&tmp), info + 3734 + i * 2, 2);
+                    stime -= tmp;
+                    memcpy(reinterpret_cast<char *>(&tmp), info + 3534 + i * 2, 2);
+                    stime -= tmp;
+                }
+                it.inc();
+            }
+            if (ans.totTime == inf) puts("0");
+            else {
+                pair <int, int> tmp = trainaddr.find(ans.trainID2);
+                char info[BlockInfo];
+                trainIO.seekg(tmp.second * BlockInfo);
+                trainIO.read(info, BlockInfo);
+                char ticketNum[BlockTicketNum];
+                int ticketNumAddr;
+                memcpy(reinterpret_cast<char *>(&ticketNumAddr), info + 3934, 4);
+                ticketNumAddr += ans.seat2;
+                ticketNumIO.seekg(ticketNumAddr * BlockTicketNum);
+                ticketNumIO.read(ticketNum, BlockTicketNum);
+                ans.seat2 = inf;
+                int i = 0;
+                while (i < info[21]) {
+                    if (cmp(info + 34 + i * 31, ans.station)) break;
+                    ++i;
+                }
+                while (i < info[21]) {
+                    if (cmp(info + 34 + i * 31, tstation.ch)) break;
+                    int tmp;
+                    memcpy(reinterpret_cast<char *>(&tmp), ticketNum + i * 4, 4);
+                    ans.seat2 = std::min(ans.seat2, tmp);
+                }
+                printf("%s %s ", ans.trainID1, sstation.ch);
+                ans.stime1.print();
+                printf(" -> %s ", ans.station);
+                ans.ttime1.print();
+                printf(" %d %d\n%s %s ", ans.price1, ans.seat1, ans.trainID2, ans.station);
+                ans.stime2.print();
+                printf(" -> %s ", tstation.ch);
+                ans.ttime2.print();
+                printf(" %d %d\n", ans.price2, ans.seat2);
+            }
+            continue;
+        }
+        if (Cmd == "buy_ticket") {
+            string username, trainID;
+            date d;
+            int n, q = 0;
+            station_train sstation, tstation;
+            while (1) {
+                readOp(op);
+                if (op == 'u') scanf("%s", username.ch);
+                if (op == 'i') scanf("%s", trainID.ch);
+                if (op == 'd') {
+                    scanf("%d-%d", &d.day, &d.month);
+                    d.calcTotDays();
+                }
+                if (op == 'n') scanf("%d", &n);
+                if (op == 'f') scanf("%s", sstation.ch);
+                if (op == 't') scanf("%s", tstation.ch);
+                if (op == 'q') {
+                    char tmp[6];
+                    scanf("%s", tmp);
+                    if (tmp[0] == 't') q = 1;
+                }
+                if (op == '\n') break;
+            }
+            printf("[%d] ", timestamp);
+        }
+        if (Cmd == "clean") {
+            while (1) {
+                readOp(op);
+                if (op == '\n') break;
+            }
+            isFirstUser = 1;
+            users.clear();
+            trainaddr.clear();
+            stations.clear();
+            tags.clear();
+            trainNum = traindateNum = 0;
+            printf("[%d] 0\n", timestamp);
+            continue;
         }
         if (Cmd == "exit") {
             int tmp = 0;
