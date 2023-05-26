@@ -462,6 +462,12 @@ public:
               info + 8 + (i - 1) * (BPTptr->KeySize + BPTptr->ValSize) + BPTptr->KeySize, BPTptr->ValSize);
             return 1;
         }
+        void modify(const T &val) {
+            memcpy(info + 8 + (i - 1) * (BPTptr->KeySize + BPTptr->ValSize) + BPTptr->KeySize,
+              reinterpret_cast<const char *>(&val), BPTptr->ValSize);
+            BPTptr->io.seekp(blockAddr * Block);
+            BPTptr->io.write(info, Block);
+        }
     };
     void insert(const Key &key, const T &val) {
         top = -1;
