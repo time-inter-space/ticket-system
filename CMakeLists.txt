@@ -1,4 +1,4 @@
-cmake_minimun_required (VERSION 3.0)
+cmake_minimun_required (VERSION 3.22)
 project(ticket_system)
 
 set(CMAKE_CXX_STANDARD 11)
