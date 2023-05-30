@@ -335,7 +335,7 @@ struct query_transfer_info {
     char trainID1[21], trainID2[21], station[31];
     realtime stime1, ttime1, stime2, ttime2;
     int price1, price2, seat1, seat2, totTime, totPrice;
-    query_transfer_info() {totTime = totPrice = inf;}
+    query_transfer_info() { totTime = totPrice = inf; }
     void update() {
         totTime = ttime2 - stime1;
         totPrice = price1 + price2;
@@ -693,7 +693,7 @@ int main() {
                 puts("-1");
                 continue;
             }
-            int isReleased;
+            int isReleased = 0;
             trainIO.seekg(tmp.second * BlockInfo + 33);
             trainIO.read(reinterpret_cast<char *>(&isReleased), 1);
             if (isReleased) {
